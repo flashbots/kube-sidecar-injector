@@ -1,0 +1,44 @@
+---
+
+kind: Pod
+apiVersion: v1
+metadata:
+  name: dummy
+spec:
+  containers:
+  - name: dummy
+    image: ubuntu
+    command:
+      - /bin/bash
+      - -c
+      - |-
+        stop() {
+          touch stop
+        }
+        trap stop SIGTERM
+        trap stop SIGINT
+        while [[ ! -f stop ]]; do sleep 1; done
+
+---
+
+kind: Pod
+apiVersion: v1
+metadata:
+  name: dummy-injected
+  labels:
+    eks.amazonaws.com/fargate-profile: default
+
+spec:
+  containers:
+  - name: dummy
+    image: ubuntu
+    command:
+      - /bin/bash
+      - -c
+      - |-
+        stop() {
+          touch stop
+        }
+        trap stop SIGTERM
+        trap stop SIGINT
+        while [[ ! -f stop ]]; do sleep 1; done

@@ -1,0 +1,67 @@
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: kube-sidecar-injector
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-sidecar-injector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-sidecar-injector
+    spec:
+      serviceAccountName: kube-sidecar-injector
+      containers:
+        - name: kube-sidecar-injector
+          image: kube-sidecar-injector:development
+          ports:
+            - name: https
+              containerPort: 8443
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: kube-sidecar-injector
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector
+spec:
+  selector:
+    app.kubernetes.io/name: kube-sidecar-injector
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+
+---
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: kube-sidecar-injector
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kube-sidecar-injector
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-sidecar-injector
+subjects:
+  - kind: ServiceAccount
+    name: kube-sidecar-injector
+    namespace: default
