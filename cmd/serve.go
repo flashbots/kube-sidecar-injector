@@ -16,7 +16,7 @@ const (
 	categoryServer = "SERVER:"
 )
 
-func CommandServe(cfg *config.Config) *cli.Command {
+func CommandServe(cfg *config.Config, globalFlags []cli.Flag) *cli.Command {
 	var rawServicePortNumber int64
 
 	debugFlags := []cli.Flag{}
@@ -99,7 +99,22 @@ func CommandServe(cfg *config.Config) *cli.Command {
 		Usage: "run the monitor server",
 		Flags: flags,
 
-		Before: func(ctx *cli.Context) error {
+		Before: func(clictx *cli.Context) error {
+			for _, i := range cfg.Inject {
+				if i.LabelSelector != nil {
+					if _, err := i.LabelSelector.LabelSelector(); err != nil {
+						return err
+					}
+				}
+				for _, c := range i.Containers {
+					if _, err := c.Container(); err != nil {
+						return fmt.Errorf("invalid config for container '%s': %w",
+							c.Name, err,
+						)
+					}
+				}
+			}
+
 			if rawServicePortNumber > 65535 {
 				return fmt.Errorf("invalid port service port number: %d", rawServicePortNumber)
 			}

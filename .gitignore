@@ -1,3 +1,7 @@
+# dev config
+
+.kube-sidecar-injector.yaml
+
 # builds
 
 /bin/*

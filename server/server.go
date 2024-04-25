@@ -26,6 +26,8 @@ type Server struct {
 	k8s *kubernetes.Clientset
 	log *zap.Logger
 	tls *cert.Bundle
+
+	inject map[string]*config.Inject
 }
 
 func New(cfg *config.Config) (*Server, error) {
@@ -59,14 +61,21 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, err
 	}
 
-	// done
+	// put everything together
 
-	return &Server{
+	srv := &Server{
 		tls: bundle,
 		cfg: cfg,
 		k8s: k8s,
 		log: l,
-	}, nil
+	}
+
+	srv.inject = make(map[string]*config.Inject, len(cfg.Inject))
+	for _, i := range cfg.Inject {
+		srv.inject[i.Fingerprint()] = &i
+	}
+
+	return srv, nil
 }
 
 func (s *Server) Run() error {
@@ -75,7 +84,7 @@ func (s *Server) Run() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.cfg.Server.PathHealthcheck, s.handleHealthcheck)
-	mux.HandleFunc(s.cfg.Server.PathWebhook, s.handleWebhook)
+	mux.HandleFunc(s.cfg.Server.PathWebhook+"/", s.handleWebhook)
 	handler := httplogger.Middleware(l, mux)
 
 	srv := &http.Server{
@@ -90,7 +99,7 @@ func (s *Server) Run() error {
 	}
 
 	l.Info("Kubernetes sidecar injector server is going up...",
-		zap.String("server_listen_address", s.cfg.Server.ListenAddress),
+		zap.String("listenAddress", s.cfg.Server.ListenAddress),
 		zap.String("version", s.cfg.Version),
 	)
 

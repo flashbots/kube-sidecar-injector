@@ -1,6 +1,6 @@
 package config
 
 type Log struct {
-	Level string `yaml:"level"`
-	Mode  string `yaml:"mode"`
+	Level string `yaml:"level,omitempty"`
+	Mode  string `yaml:"mode,omitempty"`
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/flashbots/kube-sidecar-injector/global"
 	"github.com/flashbots/kube-sidecar-injector/logutils"
 	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
 	"go.uber.org/zap"
 )
 
@@ -20,11 +21,20 @@ var (
 )
 
 func main() {
+	defaultConfigFile := "/etc/" + global.AppName + "/config.yaml"
+
 	cfg := &config.Config{
 		Version: version,
 	}
 
 	flags := []cli.Flag{
+		&cli.StringFlag{
+			EnvVars: []string{envPrefix + "CONFIG_FILE"},
+			Name:    "config-file",
+			Usage:   "config file",
+			Value:   defaultConfigFile,
+		},
+
 		&cli.StringFlag{
 			Destination: &cfg.Log.Level,
 			EnvVars:     []string{envPrefix + "LOG_LEVEL"},
@@ -43,7 +53,8 @@ func main() {
 	}
 
 	commands := []*cli.Command{
-		CommandServe(cfg),
+		CommandServe(cfg, flags),
+		CommandDumpConfig(cfg, flags),
 	}
 
 	app := &cli.App{
@@ -55,7 +66,24 @@ func main() {
 		Commands:       commands,
 		DefaultCommand: commands[0].Name,
 
-		Before: func(_ *cli.Context) error {
+		Before: func(clictx *cli.Context) error {
+			f := clictx.String("config-file")
+			if _, err := os.Stat(f); err == nil {
+				// read non-CLI config from the file
+				_cfg, err := config.ReadFrom(f)
+				if err != nil {
+					return err
+				}
+				cfg.Inject = _cfg.Inject
+				// read the rest of config
+				if err := altsrc.InitInputSourceWithContext(
+					flags,
+					altsrc.NewYamlSourceFromFlagFunc("config-file"),
+				)(clictx); err != nil {
+					return err
+				}
+			}
+
 			// setup logger
 			l, err := logutils.NewLogger(&cfg.Log)
 			if err != nil {

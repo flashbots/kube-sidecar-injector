@@ -15,7 +15,6 @@ import (
 	admission_registration_v1 "k8s.io/api/admissionregistration/v1"
 	core_v1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,7 +29,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 	cli := s.k8s.AdmissionregistrationV1()
 
 	l.Info("Fetching current mutating webhook configuration",
-		zap.String("mutating_webhook_configuration_name", s.cfg.K8S.MutatingWebhookConfigurationName),
+		zap.String("mutatingWebhookConfigurationName", s.cfg.K8S.MutatingWebhookConfigurationName),
 	)
 	present, err := cli.MutatingWebhookConfigurations().
 		Get(ctx, s.cfg.K8S.MutatingWebhookConfigurationName, meta_v1.GetOptions{})
@@ -45,16 +44,22 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 	failurePolicyIgnore := admission_registration_v1.Ignore
 	sideEffectClassNone := admission_registration_v1.SideEffectClassNone
 
-	desired := &admission_registration_v1.MutatingWebhookConfiguration{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: s.cfg.K8S.MutatingWebhookConfigurationName,
-		},
+	webhooks := make([]admission_registration_v1.MutatingWebhook, 0, len(s.cfg.Inject))
+	for _, i := range s.cfg.Inject {
+		objectSelector, err := i.LabelSelector.LabelSelector()
+		if err != nil {
+			return err
+		}
 
-		Webhooks: []admission_registration_v1.MutatingWebhook{{
-			Name: global.AppName + "." + global.OrgDomain,
+		id := i.Fingerprint()
+		path := s.cfg.Server.PathWebhook + "/" + id
+
+		webhooks = append(webhooks, admission_registration_v1.MutatingWebhook{
+			Name: fmt.Sprintf("%s.%s.%s", id, global.AppName, global.OrgDomain),
 
 			AdmissionReviewVersions: []string{"v1", "v1beta1"},
 			FailurePolicy:           &failurePolicyIgnore,
+			ObjectSelector:          objectSelector,
 			SideEffects:             &sideEffectClassNone,
 
 			ClientConfig: admission_registration_v1.WebhookClientConfig{
@@ -63,7 +68,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 				Service: &admission_registration_v1.ServiceReference{
 					Name:      s.cfg.K8S.ServiceName,
 					Namespace: s.cfg.K8S.Namespace,
-					Path:      &s.cfg.Server.PathWebhook,
+					Path:      &path,
 					Port:      &s.cfg.K8S.ServicePortNumber,
 				},
 			},
@@ -80,27 +85,25 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 					Resources:   []string{"pods"},
 				},
 			}},
+		})
+	}
 
-			ObjectSelector: &meta_v1.LabelSelector{
-				MatchExpressions: []meta_v1.LabelSelectorRequirement{{
-					Key:      "eks.amazonaws.com/fargate-profile",
-					Operator: "Exists",
-				}},
-			},
-		}},
+	desired := &admission_registration_v1.MutatingWebhookConfiguration{
+		ObjectMeta: meta_v1.ObjectMeta{Name: s.cfg.K8S.MutatingWebhookConfigurationName},
+		Webhooks:   webhooks,
 	}
 
 	if present != nil {
 		desired.ObjectMeta.ResourceVersion = present.ResourceVersion
 		l.Info("Updating existing mutating webhook configuration",
-			zap.String("mutating_webhook_configuration_name", s.cfg.K8S.MutatingWebhookConfigurationName),
+			zap.String("mutatingWebhookConfigurationName", s.cfg.K8S.MutatingWebhookConfigurationName),
 		)
 		if _, err := cli.MutatingWebhookConfigurations().Update(ctx, desired, meta_v1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("%w: %s", ErrFailedToUpsertMutatingWebhookConfiguration, err)
 		}
 	} else {
 		l.Info("Creating new mutating webhook configuration",
-			zap.String("mutating_webhook_configuration_name", s.cfg.K8S.MutatingWebhookConfigurationName),
+			zap.String("mutatingWebhookConfigurationName", s.cfg.K8S.MutatingWebhookConfigurationName),
 		)
 		if _, err := cli.MutatingWebhookConfigurations().Create(ctx, desired, meta_v1.CreateOptions{}); err != nil {
 			return fmt.Errorf("%w: %s", ErrFailedToUpsertMutatingWebhookConfiguration, err)
@@ -110,7 +113,11 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) mutate(ctx context.Context, req *admission_v1.AdmissionRequest) *admission_v1.AdmissionResponse {
+func (s *Server) mutate(
+	ctx context.Context,
+	req *admission_v1.AdmissionRequest,
+	fingerprint string,
+) *admission_v1.AdmissionResponse {
 	l := logutils.LoggerFromContext(ctx)
 
 	res := &admission_v1.AdmissionResponse{
@@ -126,6 +133,7 @@ func (s *Server) mutate(ctx context.Context, req *admission_v1.AdmissionRequest)
 	}
 
 	l.Info("Handling admission request",
+		zap.String("fingerprint", fingerprint),
 		zap.String("kind", req.Kind.Kind),
 		zap.String("name", req.Name),
 		zap.String("namespace", req.Namespace),
@@ -135,7 +143,7 @@ func (s *Server) mutate(ctx context.Context, req *admission_v1.AdmissionRequest)
 		zap.String("username", req.UserInfo.Username),
 	)
 
-	patches, err := s.mutatePod(pod)
+	patches, err := s.mutatePod(ctx, pod, fingerprint)
 	if err != nil {
 		res.Result = &meta_v1.Status{Message: err.Error()}
 		return res
@@ -155,40 +163,46 @@ func (s *Server) mutate(ctx context.Context, req *admission_v1.AdmissionRequest)
 	return res
 }
 
-func (s *Server) mutatePod(pod *core_v1.Pod) (json_patch.Patch, error) {
+func (s *Server) mutatePod(
+	ctx context.Context,
+	pod *core_v1.Pod,
+	fingerprint string,
+) (json_patch.Patch, error) {
+	l := logutils.LoggerFromContext(ctx)
+
 	res := make(json_patch.Patch, 0)
 
-	{ // inject sidecar
-		c := core_v1.Container{
-			Name:  "node-exporter",
-			Image: "prom/node-exporter:v1.7.0",
+	inject, exists := s.inject[fingerprint]
+	if !exists {
+		l.Warn("Unknown inject fingerprint => skipping...",
+			zap.String("fingerprint", fingerprint),
+		)
+		return nil, nil
+	}
 
-			Args: []string{
-				"--log.format", "json",
-				"--web.listen-address", ":9001",
-			},
-
-			Ports: []core_v1.ContainerPort{{
-				Name:          "metrics",
-				ContainerPort: 9001,
-			}},
-
-			Resources: core_v1.ResourceRequirements{
-				Requests: map[core_v1.ResourceName]resource.Quantity{
-					"cpu":    resource.MustParse("10m"),
-					"memory": resource.MustParse("64Mi"),
-				},
-			},
+	// inject containers
+	if len(inject.Containers) > 0 {
+		containers := make([]core_v1.Container, 0, len(inject.Containers))
+		for _, c := range inject.Containers {
+			l.Info("Injecting container",
+				zap.String("containerName", c.Name),
+			)
+			container, err := c.Container()
+			if err != nil {
+				return nil, err
+			}
+			containers = append(containers, *container)
 		}
 
-		p, err := patch.AddPodContainers(pod, []core_v1.Container{c})
+		p, err := patch.AddPodContainers(pod, containers)
 		if err != nil {
 			return nil, err
 		}
 		res = append(res, p...)
 	}
 
-	{ // annotate
+	// annotate
+	if len(res) > 0 {
 		p, err := patch.UpdatePodAnnotations(pod, map[string]string{
 			s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/patched": "true",
 		})

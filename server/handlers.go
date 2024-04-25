@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/flashbots/kube-sidecar-injector/logutils"
 	"go.uber.org/zap"
@@ -42,7 +43,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		const msg = "Invalid content type"
-		l.Error(msg, zap.String("content_type", contentType))
+		l.Error(msg, zap.String("contentType", contentType))
 		http.Error(w, fmt.Sprintf("%s: %s", msg, contentType), http.StatusBadRequest)
 		return
 	}
@@ -78,7 +79,11 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	admResponse := admission_v1.AdmissionReview{
-		Response: s.mutate(r.Context(), admRequest.Request),
+		Response: s.mutate(
+			r.Context(),
+			admRequest.Request,
+			strings.TrimPrefix(r.URL.Path, s.cfg.Server.PathWebhook+"/"),
+		),
 	}
 	if gvk == nil || (gvk.Group == "" && gvk.Version == "" && gvk.Kind == "") {
 		admResponse.SetGroupVersionKind(
