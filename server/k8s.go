@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	json_patch "github.com/evanphx/json-patch"
 	"github.com/flashbots/kube-sidecar-injector/global"
@@ -182,10 +183,26 @@ func (s *Server) mutatePod(
 
 	// inject containers
 	if len(inject.Containers) > 0 {
+		existing := make(map[string]struct{}, len(pod.Spec.Containers))
+		for _, c := range pod.Spec.Containers {
+			existing[c.Name] = struct{}{}
+		}
+
 		containers := make([]core_v1.Container, 0, len(inject.Containers))
 		for _, c := range inject.Containers {
+			if _, collision := existing[c.Name]; collision {
+				l.Warn("Container with the same name already exists => skipping...",
+					zap.String("containerName", c.Name),
+					zap.String("namespace", pod.Namespace),
+					zap.String("pod", pod.Name),
+				)
+				continue
+			}
+
 			l.Info("Injecting container",
 				zap.String("containerName", c.Name),
+				zap.String("namespace", pod.Namespace),
+				zap.String("pod", pod.Name),
 			)
 			container, err := c.Container()
 			if err != nil {
@@ -203,9 +220,13 @@ func (s *Server) mutatePod(
 
 	// annotate
 	if len(res) > 0 {
-		p, err := patch.UpdatePodAnnotations(pod, map[string]string{
-			s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/patched": "true",
-		})
+		annotations := make(map[string]string, len(inject.Annotations)+1)
+		for k, v := range inject.Annotations {
+			annotations[k] = v
+		}
+		annotations[s.cfg.K8S.ServiceName+"."+global.OrgDomain+"/"+fingerprint] = time.Now().Format(time.RFC3339)
+
+		p, err := patch.UpdatePodAnnotations(pod, annotations)
 		if err != nil {
 			return nil, err
 		}

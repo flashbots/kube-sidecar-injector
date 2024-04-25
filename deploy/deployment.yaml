@@ -19,7 +19,7 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector
-          image: kube-sidecar-injector:0.0.2-dev
+          image: kube-sidecar-injector:0.0.2-2-g74221a4-dev
           ports:
             - name: https
               containerPort: 8443
@@ -44,7 +44,10 @@ metadata:
 data:
   config.yaml: |-
     inject:
-      - containers:
+      - annotations:
+          test: test
+
+        containers:
           - name: node-exporter
             image: prom/node-exporter:v1.7.0
             args: [
