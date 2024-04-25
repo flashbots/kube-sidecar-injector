@@ -6,7 +6,14 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 )
 
-func AddPodContainers(pod *core_v1.Pod, containers []core_v1.Container) (json_patch.Patch, error) {
+func AddPodContainers(
+	pod *core_v1.Pod,
+	containers []core_v1.Container,
+) (json_patch.Patch, error) {
+	if len(containers) == 0 {
+		return nil, nil
+	}
+
 	res := make(json_patch.Patch, 0, len(containers))
 
 	notEmpty := len(pod.Spec.Containers) > 0

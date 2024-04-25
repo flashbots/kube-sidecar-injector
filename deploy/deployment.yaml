@@ -19,7 +19,7 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector
-          image: kube-sidecar-injector:0.0.2-2-g74221a4-dev
+          image: kube-sidecar-injector:0.0.3-dev
           ports:
             - name: https
               containerPort: 8443
@@ -44,19 +44,19 @@ metadata:
 data:
   config.yaml: |-
     inject:
-      - annotations:
-          test: test
+      - labels:
+          flashbots.net/fargate-node-exporter: true
 
         containers:
           - name: node-exporter
             image: prom/node-exporter:v1.7.0
             args: [
               "--log.format", "json",
-              "--web.listen-address", ":9001",
+              "--web.listen-address", ":9100",
             ]
             ports:
-              - name: metrics
-                containerPort: 9001
+              - name: http-metrics
+                containerPort: 9100
             resources:
               requests:
                 cpu: 10m

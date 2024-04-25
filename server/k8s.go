@@ -218,19 +218,29 @@ func (s *Server) mutatePod(
 		res = append(res, p...)
 	}
 
-	// annotate
+	// only apply labels/annotations if at least one container was injected above
 	if len(res) > 0 {
-		annotations := make(map[string]string, len(inject.Annotations)+1)
-		for k, v := range inject.Annotations {
-			annotations[k] = v
+		{ // label
+			p, err := patch.UpdatePodLabels(pod, inject.Labels)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, p...)
 		}
-		annotations[s.cfg.K8S.ServiceName+"."+global.OrgDomain+"/"+fingerprint] = time.Now().Format(time.RFC3339)
 
-		p, err := patch.UpdatePodAnnotations(pod, annotations)
-		if err != nil {
-			return nil, err
+		{ // annotate
+			annotations := make(map[string]string, len(inject.Annotations)+1)
+			for k, v := range inject.Annotations {
+				annotations[k] = v
+			}
+			annotations[s.cfg.K8S.ServiceName+"."+global.OrgDomain+"/"+fingerprint] = time.Now().Format(time.RFC3339)
+
+			p, err := patch.UpdatePodAnnotations(pod, annotations)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, p...)
 		}
-		res = append(res, p...)
 	}
 
 	return res, nil

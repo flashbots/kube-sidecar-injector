@@ -10,16 +10,19 @@ running next to it.
 
 ```yaml
 inject:
-  - containers:
+  - labels:
+      flashbots.net/fargate-node-exporter: true
+
+    containers:
       - name: node-exporter
         image: prom/node-exporter:v1.7.0
         args: [
           "--log.format", "json",
-          "--web.listen-address", ":9001",
+          "--web.listen-address", ":9100",
         ]
         ports:
-          - name: metrics
-            containerPort: 9001
+          - name: http-metrics
+            containerPort: 9100
         resources:
           requests:
             cpu: 10m
