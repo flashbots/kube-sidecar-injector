@@ -14,7 +14,7 @@ func UpdatePodLabels(
 		return nil, nil
 	}
 
-	if len(pod.Annotations) == 0 {
+	if len(pod.Labels) == 0 {
 		op, err := operation.Add("/metadata/labels", labels)
 		if err != nil {
 			return nil, err
@@ -25,7 +25,7 @@ func UpdatePodLabels(
 	res := make(json_patch.Patch, 0, len(labels))
 
 	for k, v := range labels {
-		if _, exists := pod.Annotations[k]; exists {
+		if _, exists := pod.Labels[k]; exists {
 			op, err := operation.Replace("/metadata/labels/"+operation.Escape(k), v)
 			if err != nil {
 				return nil, err

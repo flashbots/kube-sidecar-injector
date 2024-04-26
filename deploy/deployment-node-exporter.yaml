@@ -1,0 +1,91 @@
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: kube-sidecar-injector-node-exporter
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: kube-sidecar-injector-node-exporter
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+    spec:
+      serviceAccountName: kube-sidecar-injector
+      containers:
+        - name: kube-sidecar-injector-node-exporter
+          image: kube-sidecar-injector:0.0.4-dev
+          args: [
+            "serve",
+            "--mutating-webhook-configuration-name", "kube-sidecar-injector-node-exporter",
+            "--service-name", "kube-sidecar-injector-node-exporter",
+          ]
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: config
+              mountPath: /etc/kube-sidecar-injector
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: kube-sidecar-injector-node-exporter
+            items:
+              - key: config.yaml
+                path: config.yaml
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kube-sidecar-injector-node-exporter
+  labels:
+    app.kubernetes.io/name: kube-sidecar-injector-node-exporter
+data:
+  config.yaml: |-
+    inject:
+      - labelSelector:
+          matchExpressions:
+            - key: eks.amazonaws.com/fargate-profile
+              operator: Exists
+
+        labels:
+          flashbots.net/fargate-node-exporter: true
+
+        containers:
+          - name: node-exporter
+            image: prom/node-exporter:v1.7.0
+            args: [
+              "--log.format", "json",
+              "--web.listen-address", ":9100",
+            ]
+            ports:
+              - name: http-metrics
+                containerPort: 9100
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi

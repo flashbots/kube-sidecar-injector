@@ -26,4 +26,5 @@ deploy:
 		apply \
 			--filename deploy/cluster-role.yaml \
 			--filename deploy/dummy.yaml \
-			--filename deploy/deployment.yaml
+			--filename deploy/deployment-fargate.yaml \
+			--filename deploy/deployment-node-exporter.yaml

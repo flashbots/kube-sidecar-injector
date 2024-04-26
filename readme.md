@@ -10,8 +10,13 @@ running next to it.
 
 ```yaml
 inject:
-  - labels:
-      flashbots.net/fargate-node-exporter: true
+  - labelSelector:
+      matchExpressions:
+        - key: eks.amazonaws.com/fargate-profile
+          operator: Exists
+
+    labels:
+      flashbots.net/prometheus-node-exporter: true
 
     containers:
       - name: node-exporter
@@ -28,8 +33,14 @@ inject:
             cpu: 10m
             memory: 64Mi
 
-    labelSelector:
-      matchExpressions:
-        - key: eks.amazonaws.com/fargate-profile
-          operator: Exists
 ```
+
+### Caveats
+
+Single webhook configuration can me configured to apply multiple injection
+rules.  However, if these rules are supposed to interact somehow (for example
+rule A introduces changes that rule B is supposed to act upon) then they should
+be placed into _separate_ webhooks.
+
+See k8s webhook [reinvocation policy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+for the details.

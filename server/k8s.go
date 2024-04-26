@@ -44,6 +44,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 
 	failurePolicyIgnore := admission_registration_v1.Ignore
 	sideEffectClassNone := admission_registration_v1.SideEffectClassNone
+	reinvocationPolicyIfNeeded := admission_registration_v1.IfNeededReinvocationPolicy
 
 	webhooks := make([]admission_registration_v1.MutatingWebhook, 0, len(s.cfg.Inject))
 	for _, i := range s.cfg.Inject {
@@ -61,6 +62,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 			AdmissionReviewVersions: []string{"v1", "v1beta1"},
 			FailurePolicy:           &failurePolicyIgnore,
 			ObjectSelector:          objectSelector,
+			ReinvocationPolicy:      &reinvocationPolicyIfNeeded,
 			SideEffects:             &sideEffectClassNone,
 
 			ClientConfig: admission_registration_v1.WebhookClientConfig{
@@ -82,7 +84,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 
 				Rule: admission_registration_v1.Rule{
 					APIGroups:   []string{""},
-					APIVersions: []string{"v1"},
+					APIVersions: []string{"v1", "v1beta1"},
 					Resources:   []string{"pods"},
 				},
 			}},
@@ -171,12 +173,24 @@ func (s *Server) mutatePod(
 ) (json_patch.Patch, error) {
 	l := logutils.LoggerFromContext(ctx)
 
+	annotation := s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/" + fingerprint
+	if _, alreadyProcessed := pod.Annotations[annotation]; alreadyProcessed {
+		l.Info("Pod already was processes by this inject-configuration => skipping...",
+			zap.String("fingerprint", fingerprint),
+			zap.String("namespace", pod.Namespace),
+			zap.String("pod", pod.Name),
+		)
+		return nil, nil
+	}
+
 	res := make(json_patch.Patch, 0)
 
 	inject, exists := s.inject[fingerprint]
 	if !exists {
 		l.Warn("Unknown inject fingerprint => skipping...",
 			zap.String("fingerprint", fingerprint),
+			zap.String("namespace", pod.Namespace),
+			zap.String("pod", pod.Name),
 		)
 		return nil, nil
 	}
@@ -218,29 +232,26 @@ func (s *Server) mutatePod(
 		res = append(res, p...)
 	}
 
-	// only apply labels/annotations if at least one container was injected above
-	if len(res) > 0 {
-		{ // label
-			p, err := patch.UpdatePodLabels(pod, inject.Labels)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, p...)
+	{ // label
+		p, err := patch.UpdatePodLabels(pod, inject.Labels)
+		if err != nil {
+			return nil, err
 		}
+		res = append(res, p...)
+	}
 
-		{ // annotate
-			annotations := make(map[string]string, len(inject.Annotations)+1)
-			for k, v := range inject.Annotations {
-				annotations[k] = v
-			}
-			annotations[s.cfg.K8S.ServiceName+"."+global.OrgDomain+"/"+fingerprint] = time.Now().Format(time.RFC3339)
-
-			p, err := patch.UpdatePodAnnotations(pod, annotations)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, p...)
+	{ // annotate
+		annotations := make(map[string]string, len(inject.Annotations)+1)
+		for k, v := range inject.Annotations {
+			annotations[k] = v
 		}
+		annotations[annotation] = time.Now().Format(time.RFC3339)
+
+		p, err := patch.UpdatePodAnnotations(pod, annotations)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, p...)
 	}
 
 	return res, nil
