@@ -25,12 +25,14 @@ func UpdatePodLabels(
 	res := make(json_patch.Patch, 0, len(labels))
 
 	for k, v := range labels {
-		if _, exists := pod.Labels[k]; exists {
-			op, err := operation.Replace("/metadata/labels/"+operation.Escape(k), v)
-			if err != nil {
-				return nil, err
+		if o, exists := pod.Labels[k]; exists {
+			if o != v {
+				op, err := operation.Replace("/metadata/labels/"+operation.Escape(k), v)
+				if err != nil {
+					return nil, err
+				}
+				res = append(res, op)
 			}
-			res = append(res, op)
 		} else {
 			op, err := operation.Add("/metadata/labels/"+operation.Escape(k), v)
 			if err != nil {

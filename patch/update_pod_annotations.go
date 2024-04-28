@@ -25,12 +25,14 @@ func UpdatePodAnnotations(
 	res := make(json_patch.Patch, 0, len(annotations))
 
 	for k, v := range annotations {
-		if _, exists := pod.Annotations[k]; exists {
-			op, err := operation.Replace("/metadata/annotations/"+operation.Escape(k), v)
-			if err != nil {
-				return nil, err
+		if o, exists := pod.Annotations[k]; exists {
+			if o != v {
+				op, err := operation.Replace("/metadata/annotations/"+operation.Escape(k), v)
+				if err != nil {
+					return nil, err
+				}
+				res = append(res, op)
 			}
-			res = append(res, op)
 		} else {
 			op, err := operation.Add("/metadata/annotations/"+operation.Escape(k), v)
 			if err != nil {

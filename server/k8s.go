@@ -42,9 +42,9 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 		}
 	}
 
-	failurePolicyIgnore := admission_registration_v1.Ignore
-	sideEffectClassNone := admission_registration_v1.SideEffectClassNone
-	reinvocationPolicyIfNeeded := admission_registration_v1.IfNeededReinvocationPolicy
+	failurePolicy_Ignore := admission_registration_v1.Ignore
+	sideEffectClass_None := admission_registration_v1.SideEffectClassNone
+	reinvocationPolicy_IfNeeded := admission_registration_v1.IfNeededReinvocationPolicy
 
 	webhooks := make([]admission_registration_v1.MutatingWebhook, 0, len(s.cfg.Inject))
 	for _, i := range s.cfg.Inject {
@@ -53,17 +53,20 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 			return err
 		}
 
-		id := i.Fingerprint()
-		path := s.cfg.Server.PathWebhook + "/" + id
+		fingerprint := i.Fingerprint()
+		pathWebhook := s.cfg.Server.PathWebhook + "/" + fingerprint
 
 		webhooks = append(webhooks, admission_registration_v1.MutatingWebhook{
-			Name: fmt.Sprintf("%s.%s.%s", id, global.AppName, global.OrgDomain),
+			Name: fmt.Sprintf("%s.%s.%s",
+				fingerprint, s.cfg.K8S.MutatingWebhookConfigurationName, global.OrgDomain,
+			),
 
 			AdmissionReviewVersions: []string{"v1", "v1beta1"},
-			FailurePolicy:           &failurePolicyIgnore,
 			ObjectSelector:          objectSelector,
-			ReinvocationPolicy:      &reinvocationPolicyIfNeeded,
-			SideEffects:             &sideEffectClassNone,
+
+			FailurePolicy:      &failurePolicy_Ignore,
+			ReinvocationPolicy: &reinvocationPolicy_IfNeeded,
+			SideEffects:        &sideEffectClass_None,
 
 			ClientConfig: admission_registration_v1.WebhookClientConfig{
 				CABundle: s.tls.CA,
@@ -71,7 +74,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 				Service: &admission_registration_v1.ServiceReference{
 					Name:      s.cfg.K8S.ServiceName,
 					Namespace: s.cfg.K8S.Namespace,
-					Path:      &path,
+					Path:      &pathWebhook,
 					Port:      &s.cfg.K8S.ServicePortNumber,
 				},
 			},
@@ -173,12 +176,13 @@ func (s *Server) mutatePod(
 ) (json_patch.Patch, error) {
 	l := logutils.LoggerFromContext(ctx)
 
-	annotation := s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/" + fingerprint
-	if _, alreadyProcessed := pod.Annotations[annotation]; alreadyProcessed {
+	annotationProcessed := s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/" + fingerprint
+	if timestamp, alreadyProcessed := pod.Annotations[annotationProcessed]; alreadyProcessed {
 		l.Info("Pod already was processes by this inject-configuration => skipping...",
 			zap.String("fingerprint", fingerprint),
 			zap.String("namespace", pod.Namespace),
 			zap.String("pod", pod.Name),
+			zap.String("timestamp", timestamp),
 		)
 		return nil, nil
 	}
@@ -241,13 +245,18 @@ func (s *Server) mutatePod(
 	}
 
 	{ // annotate
-		annotations := make(map[string]string, len(inject.Annotations)+1)
-		for k, v := range inject.Annotations {
-			annotations[k] = v
+		p, err := patch.UpdatePodAnnotations(pod, inject.Annotations)
+		if err != nil {
+			return nil, err
 		}
-		annotations[annotation] = time.Now().Format(time.RFC3339)
+		res = append(res, p...)
+	}
 
-		p, err := patch.UpdatePodAnnotations(pod, annotations)
+	// mark pod as processed
+	if len(res) > 0 {
+		p, err := patch.UpdatePodAnnotations(pod, map[string]string{
+			annotationProcessed: time.Now().Format(time.RFC3339),
+		})
 		if err != nil {
 			return nil, err
 		}
