@@ -178,7 +178,7 @@ func (s *Server) mutatePod(
 
 	annotationProcessed := s.cfg.K8S.ServiceName + "." + global.OrgDomain + "/" + fingerprint
 	if timestamp, alreadyProcessed := pod.Annotations[annotationProcessed]; alreadyProcessed {
-		l.Info("Pod already was processes by this inject-configuration => skipping...",
+		l.Info("Pod was already processed by inject-configuration with the same fingerprint => skipping...",
 			zap.String("fingerprint", fingerprint),
 			zap.String("namespace", pod.Namespace),
 			zap.String("pod", pod.Name),
