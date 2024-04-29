@@ -71,5 +71,11 @@ data:
           matchLabels:
             app.kubernetes.io/name: dummy-injected-via-deployment
 
+        namespaceSelector:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values: [kube-system]
+
         labels:
           eks.amazonaws.com/fargate-profile: default

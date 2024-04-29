@@ -6,7 +6,8 @@ import (
 )
 
 type Inject struct {
-	LabelSelector *LabelSelector `yaml:"labelSelector,omitempty"`
+	LabelSelector     *LabelSelector `yaml:"labelSelector,omitempty"`
+	NamespaceSelector *LabelSelector `yaml:"namespaceSelector,omitempty"`
 
 	Annotations map[string]string `yaml:"annotations,omitempty"`
 	Labels      map[string]string `yaml:"labels,omitempty"`
@@ -19,6 +20,9 @@ func (i Inject) Fingerprint() string {
 
 	sum.Write([]byte("labelSelector:"))
 	i.LabelSelector.hash(sum)
+
+	sum.Write([]byte("namespaceSelector:"))
+	i.NamespaceSelector.hash(sum)
 
 	sum.Write([]byte("annotations:"))
 	for k, v := range i.Annotations {

@@ -52,6 +52,10 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		namespaceSelector, err := i.NamespaceSelector.LabelSelector()
+		if err != nil {
+			return err
+		}
 
 		fingerprint := i.Fingerprint()
 		pathWebhook := s.cfg.Server.PathWebhook + "/" + fingerprint
@@ -63,6 +67,7 @@ func (s *Server) upsertMutatingWebhookConfiguration(ctx context.Context) error {
 
 			AdmissionReviewVersions: []string{"v1", "v1beta1"},
 			ObjectSelector:          objectSelector,
+			NamespaceSelector:       namespaceSelector,
 
 			FailurePolicy:      &failurePolicy_Ignore,
 			ReinvocationPolicy: &reinvocationPolicy_IfNeeded,
@@ -180,9 +185,9 @@ func (s *Server) mutatePod(
 	if timestamp, alreadyProcessed := pod.Annotations[annotationProcessed]; alreadyProcessed {
 		l.Info("Pod was already processed by inject-configuration with the same fingerprint => skipping...",
 			zap.String("fingerprint", fingerprint),
+			zap.String("fingerprintTimestamp", timestamp),
 			zap.String("namespace", pod.Namespace),
 			zap.String("pod", pod.Name),
-			zap.String("timestamp", timestamp),
 		)
 		return nil, nil
 	}
@@ -191,7 +196,7 @@ func (s *Server) mutatePod(
 
 	inject, exists := s.inject[fingerprint]
 	if !exists {
-		l.Warn("Unknown inject fingerprint => skipping...",
+		l.Warn("Unknown inject-configuration fingerprint => skipping...",
 			zap.String("fingerprint", fingerprint),
 			zap.String("namespace", pod.Namespace),
 			zap.String("pod", pod.Name),

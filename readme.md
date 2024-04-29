@@ -15,6 +15,12 @@ inject:
         - key: eks.amazonaws.com/fargate-profile
           operator: Exists
 
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system]
+
     labels:
       flashbots.net/prometheus-node-exporter: true
 
