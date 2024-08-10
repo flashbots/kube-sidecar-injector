@@ -15,8 +15,8 @@ type Source interface {
 }
 
 var (
-	ErrFailedToGenerateCert       = errors.New("failed to generate certificate")
-	ErrFailedToGeneratePrivateKey = errors.New("failed to generate new private key")
-	ErrFailedToRegenerateCA       = errors.New("failed to (re-)generate ca")
-	ErrUnspecifiedHosts           = errors.New("no hosts specified for the certificate")
+	errFailedToGenerateCert       = errors.New("failed to generate certificate")
+	errFailedToGeneratePrivateKey = errors.New("failed to generate new private key")
+	errFailedToRegenerateCA       = errors.New("failed to (re-)generate ca")
+	errUnspecifiedHosts           = errors.New("no hosts specified for the certificate")
 )

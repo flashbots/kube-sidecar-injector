@@ -29,7 +29,7 @@ type selfSigner struct {
 
 func NewSelfSigner(organisation string, hosts []string) (Source, error) {
 	if len(hosts) == 0 {
-		return nil, ErrUnspecifiedHosts
+		return nil, errUnspecifiedHosts
 	}
 
 	serial, err := rand.Int(rand.Reader, (&big.Int{}).Exp(big.NewInt(2), big.NewInt(128), nil))
@@ -66,18 +66,18 @@ func (s *selfSigner) NewBundle() (*Bundle, error) {
 func (s *selfSigner) newEcPrivateKey() (string, crypto.Signer, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return "", nil, fmt.Errorf("%w: %w", ErrFailedToGeneratePrivateKey, err)
+		return "", nil, fmt.Errorf("%w: %w", errFailedToGeneratePrivateKey, err)
 	}
 
 	bts, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
-		return "", nil, fmt.Errorf("%w: %w", ErrFailedToGeneratePrivateKey, err)
+		return "", nil, fmt.Errorf("%w: %w", errFailedToGeneratePrivateKey, err)
 	}
 
 	var buf bytes.Buffer
 	err = pem.Encode(&buf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: bts})
 	if err != nil {
-		return "", nil, fmt.Errorf("%w: %w", ErrFailedToGeneratePrivateKey, err)
+		return "", nil, fmt.Errorf("%w: %w", errFailedToGeneratePrivateKey, err)
 	}
 
 	return buf.String(), key, nil
@@ -88,7 +88,7 @@ func (s *selfSigner) regenerateCA() error {
 
 	_, sgn, err := s.newEcPrivateKey()
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrFailedToRegenerateCA, err)
+		return fmt.Errorf("%w: %w", errFailedToRegenerateCA, err)
 	}
 
 	tpl := &x509.Certificate{
@@ -106,13 +106,13 @@ func (s *selfSigner) regenerateCA() error {
 
 	bts, err := x509.CreateCertificate(rand.Reader, tpl, tpl, sgn.Public(), sgn)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrFailedToRegenerateCA, err)
+		return fmt.Errorf("%w: %w", errFailedToRegenerateCA, err)
 	}
 
 	var buf bytes.Buffer
 	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: bts})
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrFailedToRegenerateCA, err)
+		return fmt.Errorf("%w: %w", errFailedToRegenerateCA, err)
 	}
 
 	s.caSigner = sgn
@@ -127,7 +127,7 @@ func (s *selfSigner) generateCert() (*tls.Certificate, error) {
 
 	key, sgn, err := s.newEcPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToGenerateCert, err)
+		return nil, fmt.Errorf("%w: %w", errFailedToGenerateCert, err)
 	}
 
 	cert := &x509.Certificate{
@@ -152,18 +152,18 @@ func (s *selfSigner) generateCert() (*tls.Certificate, error) {
 
 	bts, err := x509.CreateCertificate(rand.Reader, cert, s.caTemplate, sgn.Public(), s.caSigner)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToGenerateCert, err)
+		return nil, fmt.Errorf("%w: %w", errFailedToGenerateCert, err)
 	}
 
 	var buf bytes.Buffer
 	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: bts})
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToGenerateCert, err)
+		return nil, fmt.Errorf("%w: %w", errFailedToGenerateCert, err)
 	}
 
 	pair, err := tls.X509KeyPair(buf.Bytes(), []byte(key))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToGenerateCert, err)
+		return nil, fmt.Errorf("%w: %w", errFailedToGenerateCert, err)
 	}
 
 	return &pair, nil

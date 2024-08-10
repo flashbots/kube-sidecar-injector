@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrLoggerFailedToBuild = errors.New("failed to build the logger")
-	ErrLoggerInvalidLevel  = errors.New("invalid log-level")
-	ErrLoggerInvalidMode   = errors.New("invalid log-mode")
+	errLoggerFailedToBuild = errors.New("failed to build the logger")
+	errLoggerInvalidLevel  = errors.New("invalid log-level")
+	errLoggerInvalidMode   = errors.New("invalid log-mode")
 )
 
 func NewLogger(cfg *config.Log) (
@@ -27,7 +27,7 @@ func NewLogger(cfg *config.Log) (
 		config = zap.NewProductionConfig()
 	default:
 		return nil, fmt.Errorf("%w: %s",
-			ErrLoggerInvalidMode, cfg.Mode,
+			errLoggerInvalidMode, cfg.Mode,
 		)
 	}
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -35,7 +35,7 @@ func NewLogger(cfg *config.Log) (
 	logLevel, err := zap.ParseAtomicLevel(cfg.Level)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w",
-			ErrLoggerInvalidLevel, cfg.Level, err,
+			errLoggerInvalidLevel, cfg.Level, err,
 		)
 	}
 	config.Level = logLevel
@@ -43,7 +43,7 @@ func NewLogger(cfg *config.Log) (
 	l, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w",
-			ErrLoggerFailedToBuild, err,
+			errLoggerFailedToBuild, err,
 		)
 	}
 

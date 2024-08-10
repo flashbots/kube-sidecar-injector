@@ -18,8 +18,8 @@ type Config struct {
 }
 
 var (
-	ErrConfigFailedToReadFromFile  = errors.New("failed to read configuration from file")
-	ErrConfigurationFailedToDecode = errors.New("failed to decode configuration")
+	errConfigFailedToReadFromFile  = errors.New("failed to read configuration from file")
+	errConfigurationFailedToDecode = errors.New("failed to decode configuration")
 )
 
 func ReadFrom(file string) (
@@ -28,7 +28,7 @@ func ReadFrom(file string) (
 	f, err := os.OpenFile(file, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %w",
-			ErrConfigFailedToReadFromFile, file, err,
+			errConfigFailedToReadFromFile, file, err,
 		)
 	}
 	d := yaml.NewDecoder(f)
@@ -36,7 +36,7 @@ func ReadFrom(file string) (
 	var _cfg Config
 	if err := d.Decode(&_cfg); err != nil {
 		return nil, fmt.Errorf("%w: %s: %w",
-			ErrConfigurationFailedToDecode, file, err,
+			errConfigurationFailedToDecode, file, err,
 		)
 	}
 	return &Config{

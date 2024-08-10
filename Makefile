@@ -8,6 +8,10 @@ build:
 			-o ./bin/kube-sidecar-injector \
 		github.com/flashbots/kube-sidecar-injector/cmd
 
+.PHONY: docker
+docker:
+	docker build -t kube-sidecar-injector:${VERSION} .
+
 .PHONY: snapshot
 snapshot:
 	@goreleaser release --snapshot --clean
@@ -20,11 +24,12 @@ image:
 		.
 
 .PHONY: deploy
-deploy:
+deploy: image
 	@kubectl \
 			--context orbstack \
 		apply \
-			--filename deploy/cluster-role.yaml \
-			--filename deploy/dummy.yaml \
-			--filename deploy/deployment-fargate.yaml \
-			--filename deploy/deployment-node-exporter.yaml
+			--filename test/cluster-role.yaml \
+			--filename test/configmap.yaml \
+			--filename test/dummy.yaml \
+			--filename test/deployment-fargate.yaml \
+			--filename test/deployment-node-exporter.yaml

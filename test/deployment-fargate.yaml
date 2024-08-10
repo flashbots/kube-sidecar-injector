@@ -35,8 +35,10 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector-fargate
-          image: kube-sidecar-injector:0.0.4-dev
+          image: kube-sidecar-injector:0.0.8-dev
           args: [
+            "--log-level", "info",
+            "--log-mode", "dev",
             "serve",
             "--mutating-webhook-configuration-name", "kube-sidecar-injector-fargate",
             "--service-name", "kube-sidecar-injector-fargate",
@@ -67,7 +69,9 @@ metadata:
 data:
   config.yaml: |-
     inject:
-      - labelSelector:
+      - name: inject-fargate-label
+
+        labelSelector:
           matchLabels:
             app.kubernetes.io/name: dummy-injected-via-deployment
 

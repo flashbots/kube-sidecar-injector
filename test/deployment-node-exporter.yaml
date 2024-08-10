@@ -35,8 +35,10 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector-node-exporter
-          image: kube-sidecar-injector:0.0.4-dev
+          image: kube-sidecar-injector:0.0.8-dev
           args: [
+            "--log-level", "info",
+            "--log-mode", "dev",
             "serve",
             "--mutating-webhook-configuration-name", "kube-sidecar-injector-node-exporter",
             "--service-name", "kube-sidecar-injector-node-exporter",
@@ -67,7 +69,9 @@ metadata:
 data:
   config.yaml: |-
     inject:
-      - labelSelector:
+      - name: inject-node-exporter
+
+        labelSelector:
           matchExpressions:
             - key: eks.amazonaws.com/fargate-profile
               operator: Exists
@@ -89,9 +93,20 @@ data:
               "--web.listen-address", ":9100",
             ]
             ports:
-              - name: http-metrics
+              - name: node-exporter
                 containerPort: 9100
             resources:
               requests:
                 cpu: 10m
                 memory: 64Mi
+
+      - name: inject-dummy-volume
+
+        volumes:
+          - name: dummy
+            configMap:
+              name: dummy
+
+        volumeMounts:
+          - name: dummy
+            mountPath: /var/dummy

@@ -16,9 +16,9 @@ metadata:
   labels:
     app.kubernetes.io/name: kube-sidecar-injector
 rules:
-- apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["mutatingwebhookconfigurations"]
-  verbs: ["create", "get", "delete", "list", "patch", "update", "watch"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["create", "get", "delete", "list", "patch", "update", "watch"]
 
 ---
 
