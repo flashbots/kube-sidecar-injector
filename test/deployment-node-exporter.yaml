@@ -35,7 +35,7 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector-node-exporter
-          image: kube-sidecar-injector:0.0.8-dev
+          image: kube-sidecar-injector:0.0.9-dev
           args: [
             "--log-level", "info",
             "--log-mode", "dev",

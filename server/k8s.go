@@ -143,6 +143,14 @@ func (s *Server) mutate(
 		UID:     req.UID,
 	}
 
+	if req.Kind.Kind != "Pod" || req.Kind.Group != "" {
+		l.Warn("Received admission request for a non-pod object => skipping...",
+			zap.String("group", req.Kind.Group),
+			zap.String("kind", req.Kind.Kind),
+		)
+		return res
+	}
+
 	pod := &core_v1.Pod{}
 	if err := json.Unmarshal(req.Object.Raw, pod); err != nil {
 		l.Error("Failed to decode raw object for pod",
@@ -170,6 +178,11 @@ func (s *Server) mutate(
 		zap.String("username", req.UserInfo.Username),
 	)
 
+	l.Debug("Admission request details",
+		zap.Any("admissionRequest", req),
+		zap.Any("pod", pod),
+	)
+
 	patches, err := s.mutatePod(ctx, pod, fingerprint)
 	if err != nil {
 		l.Error("Failed to mutate pod",
@@ -191,6 +204,10 @@ func (s *Server) mutate(
 		res.Patch = b
 		res.PatchType = &patchType
 	}
+
+	l.Debug("Admission response details",
+		zap.Any("admissionRequest", res),
+	)
 
 	return res
 }
@@ -264,15 +281,15 @@ func (s *Server) mutatePod(
 		for idx, c := range pod.Spec.Containers {
 			existing := make(map[string]struct{}, len(c.VolumeMounts))
 			for _, vm := range c.VolumeMounts {
-				existing[vm.Name] = struct{}{}
+				existing[vm.MountPath] = struct{}{}
 			}
 
 			volumeMounts := make([]core_v1.VolumeMount, 0, len(inject.VolumeMounts))
 			for _, vm := range inject.VolumeMounts {
-				if _, collision := existing[vm.Name]; collision {
-					l.Warn("Volume mount with the same name already exists => skipping...",
+				if _, collision := existing[vm.MountPath]; collision {
+					l.Warn("Volume mount with the same mount path already exists => skipping...",
 						zap.String("container", c.Name),
-						zap.String("volumeMount", vm.Name),
+						zap.String("mountPath", vm.MountPath),
 					)
 					continue
 				}
@@ -347,11 +364,6 @@ func (s *Server) mutatePod(
 
 	// mark pod as processed
 	if len(res) > 0 {
-		l.Debug("Created patch for pod",
-			zap.Any("pod", pod),
-			zap.Any("patch", res),
-		)
-
 		timestamp := time.Now().Format(time.RFC3339)
 		p, err := patch.UpdatePodAnnotations(pod, map[string]string{
 			annotationProcessed: timestamp,
