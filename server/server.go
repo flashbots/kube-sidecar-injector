@@ -72,7 +72,7 @@ func New(cfg *config.Config) (*Server, error) {
 
 	srv.inject = make(map[string]*config.Inject, len(cfg.Inject))
 	for _, i := range cfg.Inject {
-		srv.inject[i.Fingerprint()] = &i
+		srv.inject[i.Fingerprint()] = i
 	}
 
 	return srv, nil

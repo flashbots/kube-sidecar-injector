@@ -9,10 +9,10 @@ import (
 )
 
 type Config struct {
-	Inject []Inject `yaml:"inject,omitempty"`
-	K8S    K8S      `yaml:"k8s"`
-	Log    Log      `yaml:"log"`
-	Server Server   `yaml:"server"`
+	Inject []*Inject `yaml:"inject,omitempty"`
+	K8S    K8S       `yaml:"k8s"`
+	Log    Log       `yaml:"log"`
+	Server Server    `yaml:"server"`
 
 	Version string
 }

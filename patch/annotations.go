@@ -6,35 +6,35 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 )
 
-func UpdatePodLabels(
+func UpsertPodAnnotations(
 	pod *core_v1.Pod,
-	labels map[string]string,
+	annotations map[string]string,
 ) (json_patch.Patch, error) {
-	if len(labels) == 0 {
+	if len(annotations) == 0 {
 		return nil, nil
 	}
 
-	if len(pod.Labels) == 0 {
-		op, err := operation.Add("/metadata/labels", labels)
+	if len(pod.Annotations) == 0 {
+		op, err := operation.Add("/metadata/annotations", annotations)
 		if err != nil {
 			return nil, err
 		}
 		return []json_patch.Operation{op}, nil
 	}
 
-	res := make(json_patch.Patch, 0, len(labels))
+	res := make(json_patch.Patch, 0, len(annotations))
 
-	for k, v := range labels {
-		if o, exists := pod.Labels[k]; exists {
+	for k, v := range annotations {
+		if o, exists := pod.Annotations[k]; exists {
 			if o != v {
-				op, err := operation.Replace("/metadata/labels/"+operation.Escape(k), v)
+				op, err := operation.Replace("/metadata/annotations/"+operation.Escape(k), v)
 				if err != nil {
 					return nil, err
 				}
 				res = append(res, op)
 			}
 		} else {
-			op, err := operation.Add("/metadata/labels/"+operation.Escape(k), v)
+			op, err := operation.Add("/metadata/annotations/"+operation.Escape(k), v)
 			if err != nil {
 				return nil, err
 			}

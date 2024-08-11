@@ -6,28 +6,28 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 )
 
-func AddPodVolumes(
+func InsertPodContainers(
 	pod *core_v1.Pod,
-	volumes []core_v1.Volume,
+	containers []core_v1.Container,
 ) (json_patch.Patch, error) {
-	if len(volumes) == 0 {
+	if len(containers) == 0 {
 		return nil, nil
 	}
 
-	res := make(json_patch.Patch, 0, len(volumes))
+	res := make(json_patch.Patch, 0, len(containers))
 
-	notEmpty := len(pod.Spec.Volumes) > 0
-	for _, v := range volumes {
+	notEmpty := len(pod.Spec.Containers) > 0
+	for _, c := range containers {
 		var (
 			op  json_patch.Operation
 			err error
 		)
 
 		if notEmpty {
-			op, err = operation.Add("/spec/volumes/-", v)
+			op, err = operation.Add("/spec/containers/-", c)
 		} else {
 			notEmpty = true
-			op, err = operation.Add("/spec/volumes", []core_v1.Volume{v})
+			op, err = operation.Add("/spec/containers", []core_v1.Container{c})
 		}
 
 		if err != nil {

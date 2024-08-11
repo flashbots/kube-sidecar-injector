@@ -8,11 +8,12 @@ import (
 type Inject struct {
 	Name string `yaml:"name,omitempty"`
 
+	MaxIterations int `yaml:"maxIterations,omitempty"`
+
 	LabelSelector     *InjectLabelSelector `yaml:"labelSelector,omitempty"`
 	NamespaceSelector *InjectLabelSelector `yaml:"namespaceSelector,omitempty"`
 
-	Annotations map[string]string `yaml:"annotations,omitempty"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
+	Labels map[string]string `yaml:"labels,omitempty"`
 
 	Containers   []InjectContainer   `yaml:"containers,omitempty"`
 	VolumeMounts []InjectVolumeMount `yaml:"volumeMounts,omitempty"`
@@ -40,22 +41,6 @@ func (i Inject) Fingerprint() string {
 		if i.NamespaceSelector != nil {
 			sum.Write([]byte("namespaceSelector:"))
 			i.NamespaceSelector.hash(sum)
-			sum.Write([]byte{255})
-		}
-	}
-
-	{ // annotations
-		if len(i.Annotations) > 0 {
-			sum.Write([]byte("annotations:"))
-			for k, v := range i.Annotations {
-				sum.Write([]byte("key:"))
-				sum.Write([]byte(k))
-				sum.Write([]byte{255})
-
-				sum.Write([]byte("value:"))
-				sum.Write([]byte(v))
-				sum.Write([]byte{255})
-			}
 			sum.Write([]byte{255})
 		}
 	}

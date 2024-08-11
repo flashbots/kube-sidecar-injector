@@ -101,6 +101,9 @@ func CommandServe(cfg *config.Config, globalFlags []cli.Flag) *cli.Command {
 
 		Before: func(clictx *cli.Context) error {
 			for _, i := range cfg.Inject {
+				if i.MaxIterations <= 0 {
+					i.MaxIterations = config.DefaultMaxIterations
+				}
 				if i.LabelSelector != nil {
 					if _, err := i.LabelSelector.LabelSelector(); err != nil {
 						return err
