@@ -278,6 +278,40 @@ func (s *Server) mutatePod(
 
 	// inject volume mounts
 	if len(inject.VolumeMounts) > 0 {
+		for idx, c := range pod.Spec.InitContainers {
+			existing := make(map[string]struct{}, len(c.VolumeMounts))
+			for _, vm := range c.VolumeMounts {
+				existing[vm.MountPath] = struct{}{}
+			}
+
+			volumeMounts := make([]core_v1.VolumeMount, 0, len(inject.VolumeMounts))
+			for _, vm := range inject.VolumeMounts {
+				if _, collision := existing[vm.MountPath]; collision {
+					l.Warn("Volume mount with the same mount path already exists in the init-container => skipping...",
+						zap.String("initContainer", c.Name),
+						zap.String("mountPath", vm.MountPath),
+					)
+					continue
+				}
+
+				l.Info("Injecting volume mount into the init-container",
+					zap.String("initContainer", c.Name),
+					zap.String("volumeMount", vm.Name),
+				)
+				volumeMount, err := vm.VolumeMount()
+				if err != nil {
+					return nil, err
+				}
+				volumeMounts = append(volumeMounts, *volumeMount)
+			}
+
+			p, err := patch.AddInitContainerVolumeMounts(idx, &c, volumeMounts)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, p...)
+		}
+
 		for idx, c := range pod.Spec.Containers {
 			existing := make(map[string]struct{}, len(c.VolumeMounts))
 			for _, vm := range c.VolumeMounts {
@@ -287,14 +321,14 @@ func (s *Server) mutatePod(
 			volumeMounts := make([]core_v1.VolumeMount, 0, len(inject.VolumeMounts))
 			for _, vm := range inject.VolumeMounts {
 				if _, collision := existing[vm.MountPath]; collision {
-					l.Warn("Volume mount with the same mount path already exists => skipping...",
+					l.Warn("Volume mount with the same mount path already exists in the container => skipping...",
 						zap.String("container", c.Name),
 						zap.String("mountPath", vm.MountPath),
 					)
 					continue
 				}
 
-				l.Info("Injecting volume mount",
+				l.Info("Injecting volume mount into the container",
 					zap.String("container", c.Name),
 					zap.String("volumeMount", vm.Name),
 				)
