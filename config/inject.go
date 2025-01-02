@@ -15,7 +15,9 @@ type Inject struct {
 
 	Labels map[string]string `yaml:"labels,omitempty"`
 
+	Affinity     *InjectAffinity     `yaml:"affinity,omitempty"`
 	Containers   []InjectContainer   `yaml:"containers,omitempty"`
+	Tolerations  []InjectToleration  `yaml:"tolerations,omitempty"`
 	VolumeMounts []InjectVolumeMount `yaml:"volumeMounts,omitempty"`
 	Volumes      []InjectVolume      `yaml:"volumes,omitempty"`
 }
@@ -61,11 +63,29 @@ func (i Inject) Fingerprint() string {
 		}
 	}
 
+	{ // affinity
+		if i.Affinity != nil {
+			sum.Write([]byte("affinity:"))
+			i.Affinity.hash(sum)
+			sum.Write([]byte{255})
+		}
+	}
+
 	{ // containers
 		if len(i.Containers) > 0 {
 			sum.Write([]byte("containers:"))
 			for _, c := range i.Containers {
 				c.hash(sum)
+			}
+			sum.Write([]byte{255})
+		}
+	}
+
+	{ // tolerations
+		if len(i.Tolerations) > 0 {
+			sum.Write([]byte("tolerations:"))
+			for _, t := range i.Tolerations {
+				t.hash(sum)
 			}
 			sum.Write([]byte{255})
 		}

@@ -35,7 +35,7 @@ spec:
       serviceAccountName: kube-sidecar-injector
       containers:
         - name: kube-sidecar-injector-node-exporter
-          image: kube-sidecar-injector:0.0.11-dev
+          image: kube-sidecar-injector:0.0.12-dev
           args: [
             "--log-level", "info",
             "--log-mode", "dev",
@@ -99,6 +99,21 @@ data:
               requests:
                 cpu: 10m
                 memory: 64Mi
+
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: In
+                      values:
+                        - orbstack
+
+        tolerations:
+          - key: flashbots.net/test
+            operator: Equal
+            value: true
 
       - name: inject-dummy-volume
 

@@ -192,7 +192,7 @@ func (s *Server) mutate(
 		res.Result = &meta_v1.Status{Message: err.Error()}
 		return res
 	}
-	if patches != nil && len(patches) > 0 {
+	if len(patches) > 0 {
 		b, err := json.Marshal(patches)
 		if err != nil {
 			l.Error("Failed to encode pod patches",
@@ -235,6 +235,15 @@ func (s *Server) mutatePod(
 	}
 
 	res := make(json_patch.Patch, 0)
+
+	// inject affinity
+	if inject.Affinity != nil {
+		p, err := patch.InsertAffinity(pod, inject.Affinity)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, p...)
+	}
 
 	// inject volumes
 	if len(inject.Volumes) > 0 {
@@ -367,6 +376,39 @@ func (s *Server) mutatePod(
 		}
 
 		p, err := patch.InsertPodContainers(pod, containers)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, p...)
+	}
+
+	// inject tolerations
+	if len(inject.Tolerations) > 0 {
+		existing := make(map[string]struct{}, len(pod.Spec.Tolerations))
+		for _, t := range pod.Spec.Tolerations {
+			existing[t.Key] = struct{}{}
+		}
+
+		tolerations := make([]core_v1.Toleration, 0, len(pod.Spec.Tolerations))
+		for _, t := range inject.Tolerations {
+			if _, collision := existing[t.Key]; collision {
+				l.Warn("Toleration with the same key already exists => skipping...",
+					zap.String("key", t.Key),
+				)
+				continue
+			}
+
+			l.Info("Injecting toleration",
+				zap.String("key", t.Key),
+			)
+			toleration, err := t.Toleration()
+			if err != nil {
+				return nil, err
+			}
+			tolerations = append(tolerations, *toleration)
+		}
+
+		p, err := patch.InsertTolerations(pod, tolerations)
 		if err != nil {
 			return nil, err
 		}
