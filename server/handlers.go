@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +37,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	l := logutils.LoggerFromRequest(r)
 
 	defer func() {
-		if _, err := io.ReadAll(r.Body); err != nil {
+		if _, err := io.ReadAll(r.Body); err != nil && !errors.Is(err, http.ErrBodyReadAfterClose) {
 			l.Error("Failed to read the full request body", zap.Error(err))
 		}
 	}()

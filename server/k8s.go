@@ -242,6 +242,9 @@ func (s *Server) mutatePod(
 		if err != nil {
 			return nil, err
 		}
+		if len(p) > 0 {
+			l.Info("Injecting affinity")
+		}
 		res = append(res, p...)
 	}
 
